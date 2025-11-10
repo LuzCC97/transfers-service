@@ -15,11 +15,37 @@ public class TransferController {
         this.transferService = transferService;
     }
 
-    @PostMapping ("/create")
-    public ResponseEntity<TransferResponse> createTransfer(@RequestBody TransferRequest request) {
+    @PostMapping("/create")
+    public ResponseEntity<?> createTransfer(@RequestBody(required = false) TransferRequest request) {
 
+        // Validación 1: si el body viene vacío o null → 400 Bad Request
+        if (request == null) {
+            String mensaje = "Solicitud inválida: el cuerpo (body) de la solicitud no puede estar vacío.";
+            return ResponseEntity
+                    .status(400)
+                    .body(mensaje);
+        }
+
+        // Validación 2: campos obligatorios mínimos
+        if (request.getSourceAccount() == null || request.getDestinationAccount() == null) {
+            String mensaje = "Solicitud inválida: las cuentas de origen y destino son obligatorias.";
+            return ResponseEntity
+                    .status(400)
+                    .body(mensaje);
+        }
+
+        if (request.getTransferData() == null || request.getTransferData().getAmount() == null) {
+            String mensaje = "Solicitud inválida: se requiere un monto válido en transferData.";
+            return ResponseEntity
+                    .status(400)
+                    .body(mensaje);
+        }
+
+        // Si pasa las validaciones, llamamos al servicio para crear la transferencia
         TransferResponse response = transferService.createTransfer(request);
 
+        // 201 = creado correctamente
         return ResponseEntity.status(201).body(response);
     }
 }
+
