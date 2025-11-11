@@ -1,8 +1,13 @@
 package com.example.transfers_service.dto.request;
 
-import lombok.Data;
+import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
 public class CustomerRef {
-    private String accountId;
+
+    @NotBlank(message = "El accountId del cliente es obligatorio")
+    private String customerId;
 }

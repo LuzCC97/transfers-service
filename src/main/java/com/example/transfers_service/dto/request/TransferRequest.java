@@ -1,13 +1,23 @@
 package com.example.transfers_service.dto.request;
 
-import lombok.Data;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
 public class TransferRequest {
 
+    @Valid
     private CustomerRef customer;
+
+    @Valid
     private AccountRef sourceAccount;
+
+    @Valid
     private AccountRef destinationAccount;
+
+    @Valid
     private TransferData transferData;
 }
-
