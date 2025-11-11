@@ -193,37 +193,6 @@ public class TransferServiceImpl implements TransferService {
         }
     }
 
-    // Helper de conversión: devuelve el monto convertido y la tasa aplicada
-    private static class FxResult {
-        final double convertedAmount;
-        final double rate;
-        final String side; // "COMPRA" o "VENTA"
-        FxResult(double convertedAmount, double rate, String side) {
-            this.convertedAmount = convertedAmount;
-            this.rate = rate;
-            this.side = side;
-        }
-    }
-
-    private FxResult convertAmount(String sourceCurrency, String destCurrency, double amount) {
-        String src = sourceCurrency.toUpperCase();
-        String dst = destCurrency.toUpperCase();
-        if (src.equals(dst)) {
-            return new FxResult(amount, 1.0, "NA");
-        }
-        if (src.equals(CUR_PEN) && dst.equals(CUR_USD)) {
-            // Compras USD -> aplicas VENTA (pagas más PEN por cada USD)
-            double converted = round2(amount / FX_VENTA);
-            return new FxResult(converted, FX_VENTA, "VENTA");
-        }
-        if (src.equals(CUR_USD) && dst.equals(CUR_PEN)) {
-            // Vendes USD -> aplicas COMPRA (recibes menos PEN por cada USD)
-            double converted = round2(amount * FX_COMPRA);
-            return new FxResult(converted, FX_COMPRA, "COMPRA");
-        }
-        throw new IllegalArgumentException("Moneda no soportada: " + src + " -> " + dst);
-    }
-
     // Redondeo a 2 decimales
     private double round2(double v) {
         return new java.math.BigDecimal(v).setScale(2, java.math.RoundingMode.HALF_UP).doubleValue();
