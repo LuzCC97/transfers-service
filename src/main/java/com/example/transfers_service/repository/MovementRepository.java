@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 public interface MovementRepository extends JpaRepository<Movement, String> {
     // luego aquí podemos poner:
     // List<Movement> findByTransferId(String transferId);
+    //REDIFINIR EL GENERADOR DE ID
     @Query(value = "SELECT LPAD(\n" +
             "         IFNULL(MAX(CAST(RIGHT(movement_id, 8) AS UNSIGNED)), 0) + 1,\n" +
             "         8,\n" +
