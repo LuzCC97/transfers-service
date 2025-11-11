@@ -42,107 +42,136 @@ public class TransferServiceImpl implements TransferService {
     @Override
     @Transactional
     public TransferResponse createTransfer(TransferRequest request) {
-
-        // obtener la cuenta origen del request
+        // 1) Origen
         String sourceAccountId = request.getSourceAccount().getAccountId();
-
-        // buscar en BD la cuenta origen (con bloqueo recomendado)
         var sourceAccountEntity = accountRepository.findAndLockByAccountId(sourceAccountId)
                 .orElseThrow(() -> new RuntimeException("Cuenta no existe: " + sourceAccountId));
 
-        // monedas
-        String sourceCurrency = sourceAccountEntity.getCurrency();        // ej. PEN o USD
-        String destCurrency   = request.getDestinationAccount().getCurrency();
+        // 2) Monedas
+        String sourceCurrency = sourceAccountEntity.getCurrency();                 // moneda nativa origen
+        String destCurrency   = request.getDestinationAccount().getCurrency();     // moneda nativa destino
+        String userCurrency   = request.getTransferData().getCurrency();           // moneda elegida por el cliente
 
-        if (!sourceCurrency.equalsIgnoreCase(CUR_PEN) && !sourceCurrency.equalsIgnoreCase(CUR_USD)) {
-            throw new IllegalArgumentException("Moneda de origen no soportada: " + sourceCurrency);
+        for (String cur : new String[]{sourceCurrency, destCurrency, userCurrency}) {
+            if (!cur.equalsIgnoreCase(CUR_PEN) && !cur.equalsIgnoreCase(CUR_USD)) {
+                throw new IllegalArgumentException("Moneda no soportada: " + cur);
+            }
         }
-        if (!destCurrency.equalsIgnoreCase(CUR_PEN) && !destCurrency.equalsIgnoreCase(CUR_USD)) {
-            throw new IllegalArgumentException("Moneda de destino no soportada: " + destCurrency);
+
+        // 3) Monto input y monto a debitar en moneda de la cuenta origen (amountInSource)
+        double userAmount = request.getTransferData().getAmount();
+
+        double amountInSource;
+        String debitSide;
+        double debitRate;
+
+        if (userCurrency.equalsIgnoreCase(sourceCurrency)) {
+            amountInSource = userAmount;
+            debitSide = "NA";
+            debitRate = 1.0;
+        } else if (sourceCurrency.equalsIgnoreCase(CUR_PEN) && userCurrency.equalsIgnoreCase(CUR_USD)) {
+            // Cliente envía USD desde cuenta en PEN: banco vende USD => VENTA (PEN = USD * 3.80)
+            amountInSource = round2(userAmount * FX_VENTA);
+            debitSide = "VENTA";
+            debitRate = FX_VENTA;
+        } else if (sourceCurrency.equalsIgnoreCase(CUR_USD) && userCurrency.equalsIgnoreCase(CUR_PEN)) {
+            // Cliente envía PEN desde cuenta en USD: banco compra USD => COMPRA (USD = PEN / 3.50)
+            amountInSource = round2(userAmount / FX_COMPRA);
+            debitSide = "COMPRA";
+            debitRate = FX_COMPRA;
+        } else {
+            throw new IllegalArgumentException("Par de monedas no soportado para débito: " + userCurrency + " -> " + sourceCurrency);
         }
 
-        // monto original en moneda de origen (lo que el usuario envía)
-        double originalAmount = request.getTransferData().getAmount();
-
-        // conversión (si aplica). El total que sale de la cuenta origen sigue siendo el original
-        FxResult fx = convertAmount(sourceCurrency, destCurrency, originalAmount);
-
-        // validar saldo suficiente (el total que sale = monto original)
-        if (sourceAccountEntity.getBalance() == null || sourceAccountEntity.getBalance() < originalAmount) {
+        // 4) Validar saldo (se debita amountInSource en moneda origen)
+        if (sourceAccountEntity.getBalance() == null || sourceAccountEntity.getBalance() < amountInSource) {
             throw new InsufficientBalanceException(
-                    "Saldo insuficiente. Saldo: " + sourceAccountEntity.getBalance() + ", requerido: " + originalAmount
+                    "Saldo insuficiente. Saldo: " + sourceAccountEntity.getBalance() + ", requerido: " + amountInSource
             );
         }
 
-        // obtener el customerId real desde la cuenta
+        // 5) Datos adicionales
         String customerId = sourceAccountEntity.getCustomerId();
-
-        // obtener los demás datos del request
         var destAccount = request.getDestinationAccount();
         var transferData = request.getTransferData();
-
-        // determinar tipo de transferencia según fecha/hora
         var dateTime = LocalDateTime.now();
         String transferType = determineTransferType(dateTime);
 
-        // comisiones (en moneda de origen)
+        // 6) Costos en moneda origen
         double commission = transferType.equalsIgnoreCase("ONLINE") ? 2.00 : 1.00;
-        double itf = originalAmount * 0.0005;
+        double itf = amountInSource * 0.0005;
 
-        // neto que sale por el movimiento principal (en moneda de origen)
-        double netAmount = originalAmount - (commission + itf);
+        // 7) Neto (en moneda origen)
+        double netAmount = amountInSource - (commission + itf);
         if (netAmount < 0) {
             throw new IllegalArgumentException("El neto de la transferencia no puede ser negativo");
         }
 
-        // estado según tipo
-        String status = transferType.equalsIgnoreCase("ONLINE") ? "EJECUTADA" : "PENDIENTE";
+        // 8) Debitar saldo de cuenta origen por el total debitado
+        double newSourceBalance = round2(sourceAccountEntity.getBalance() - amountInSource);
+        sourceAccountEntity.setBalance(newSourceBalance);
 
-        // generar ID correlativo con prefijo
+        // 9) Transfer
+        String status = transferType.equalsIgnoreCase("ONLINE") ? "EJECUTADA" : "PENDIENTE";
         String transferId = "TRX-" + idGeneratorService.nextTransferId();
 
-        // armar entity Transfer (monto ORIGINAL en moneda de origen)
+        String baseDesc = transferData.getDescription();
+        String descInput = String.format(" | INPUT %.2f %s -> DEBIT %.2f %s (FX %s %.2f)",
+                userAmount, userCurrency.toUpperCase(),
+                amountInSource, sourceCurrency.toUpperCase(),
+                debitSide, debitRate);
+
         Transfer transfer = new Transfer();
         transfer.setTransferId(transferId);
         transfer.setCustomerId(customerId);
         transfer.setSourceAccountId(sourceAccountId);
         transfer.setDestAccountNumber(destAccount.getAccountId());
-        transfer.setDestCurrency(destAccount.getCurrency());
-        transfer.setAmount(originalAmount); // monto ORIGINAL
-        // enriquecer descripción con detalle FX si aplica
-        String baseDesc = transferData.getDescription();
-        String fxDesc = sourceCurrency.equalsIgnoreCase(destCurrency)
-                ? ""
-                : String.format(" | FX %s %.2f (%s->%s) -> %.2f",
-                fx.side, fx.rate, sourceCurrency, destCurrency, fx.convertedAmount);
-        transfer.setDescription((baseDesc == null ? "" : baseDesc) + fxDesc);
+        transfer.setDestCurrency(destCurrency);                // moneda nativa destino
+        transfer.setAmount(amountInSource);                    // lo DEBITADO (moneda origen)
+        transfer.setDescription((baseDesc == null ? "" : baseDesc) + descInput);
         transfer.setTransferDatetime(LocalDateTime.now());
         transfer.setTransferType(transferType.toUpperCase());
         transfer.setStatus(status);
 
-        // guardar transferencia
         transferRepository.save(transfer);
 
-        // movimientos en moneda de origen (todos OUT, negativos)
-        // Transferencia (neto)
+        // 10) Movimientos OUT (moneda origen)
         saveMovement(sourceAccountId, transferId, -netAmount, "OUT", "monto transferencia (neto)");
-
-        // Comisión
         saveMovement(sourceAccountId, transferId, -commission, "OUT", "comisión por transferencia " + transferType);
-
-        // ITF
         saveMovement(sourceAccountId, transferId, -itf, "OUT", "ITF");
 
-        // armar respuesta
+        // 11) Crédito a destino si la cuenta es interna (en su moneda nativa)
+        accountRepository.findAndLockByAccountId(destAccount.getAccountId()).ifPresent(destEntity -> {
+            if (!destEntity.getCurrency().equalsIgnoreCase(destCurrency)) {
+                throw new IllegalArgumentException("La moneda de la cuenta destino en BD ("
+                        + destEntity.getCurrency() + ") no coincide con la solicitada (" + destCurrency + ")");
+            }
+
+            // Convertir el NETO desde moneda origen hacia destino
+            FxResult fxSrcToDest = convertAmount(sourceCurrency, destCurrency, netAmount);
+            double destCredit = fxSrcToDest.convertedAmount;
+
+            String descIn = sourceCurrency.equalsIgnoreCase(destCurrency)
+                    ? "abono transferencia (neto)"
+                    : String.format("abono transferencia (neto convertido) FX %s %.2f (%s->%s)",
+                    fxSrcToDest.side, fxSrcToDest.rate, sourceCurrency, destCurrency);
+
+            saveMovement(destEntity.getAccountId(), transferId, destCredit, "IN", descIn);
+
+            // actualizar saldo destino
+            double newDestBalance = round2(destEntity.getBalance() + destCredit);
+            destEntity.setBalance(newDestBalance);
+        });
+
+        // 12) Respuesta
         TransferResponse response = new TransferResponse();
         response.setTransferId(transferId);
         response.setStatus(status);
         response.setTransferType(transferType.toUpperCase());
-        response.setCommissionApplied(commission + itf); // total aplicado
+        response.setCommissionApplied(commission + itf);
 
         return response;
     }
-
     private void saveMovement(String accountId, String transferId, double amount, String type, String description) {
         Movement m = new Movement();
         m.setMovementId("MOV-" + idGeneratorService.nextMovementId()); // 8 dígitos con prefijo
