@@ -2,6 +2,7 @@ package com.example.transfers_service.controller;
 import com.example.transfers_service.dto.request.TransferRequest;
 import com.example.transfers_service.dto.response.TransferResponse;
 import com.example.transfers_service.service.TransferService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,7 +19,7 @@ public class TransferController {
     }
 
     @PostMapping("/create")
-    public ResponseEntity<TransferResponse> createTransfer(@RequestBody TransferRequest request) {
+    public ResponseEntity<TransferResponse> createTransfer(@Valid @RequestBody TransferRequest request) {
         TransferResponse response = transferService.createTransfer(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
