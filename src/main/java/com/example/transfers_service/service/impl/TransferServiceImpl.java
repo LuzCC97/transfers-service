@@ -22,15 +22,22 @@ public class TransferServiceImpl implements TransferService {
     private final MovementRepository movementRepository;
     private final AccountRepository accountRepository;
     private final IdGeneratorService idGeneratorService;
+    private final com.example.transfers_service.mapper.TransferMapper transferMapper;
+    private final com.example.transfers_service.mapper.MovementMapper movementMapper;
+
 
     public TransferServiceImpl(TransferRepository transferRepository,
                                MovementRepository movementRepository,
                                AccountRepository accountRepository,
-                               IdGeneratorService idGeneratorService) {
+                               IdGeneratorService idGeneratorService,
+                               com.example.transfers_service.mapper.TransferMapper transferMapper,
+                               com.example.transfers_service.mapper.MovementMapper movementMapper) {
         this.transferRepository = transferRepository;
         this.movementRepository = movementRepository;
         this.accountRepository = accountRepository;
         this.idGeneratorService = idGeneratorService;
+        this.transferMapper = transferMapper;
+        this.movementMapper = movementMapper;
     }
 
     // DATOS PARA CONVERSION
@@ -124,17 +131,18 @@ public class TransferServiceImpl implements TransferService {
                 debitSide, debitRate);
         //CAMBIAR A MAPSTRUCT (LESS)
 
-        Transfer transfer = new Transfer();
-        transfer.setTransferId(transferId);
-        transfer.setCustomerId(customerId);
-        transfer.setSourceAccountId(sourceAccountId);
-        transfer.setDestAccountNumber(destAccount.getAccountId());
-        transfer.setDestCurrency(destCurrency);                // moneda nativa destino
-        transfer.setAmount(userAmount);                    // lo DEBITADO (moneda origen)
-        transfer.setDescription((baseDesc == null ? "" : baseDesc) + descInput);
-        transfer.setTransferDatetime(LocalDateTime.now());
-        transfer.setTransferType(transferType.toUpperCase());
-        transfer.setStatus(status);
+        Transfer transfer = transferMapper.toTransfer(
+                transferId,
+                customerId,
+                sourceAccountId,
+                destAccount.getAccountId(),
+                destCurrency,
+                userAmount,
+                (baseDesc == null ? "" : baseDesc) + descInput,
+                LocalDateTime.now(),
+                transferType.toUpperCase(),
+                status
+        );
 
         transferRepository.save(transfer);
 
@@ -159,24 +167,21 @@ public class TransferServiceImpl implements TransferService {
         });
 
         // 12) Respuesta
-        TransferResponse response = new TransferResponse();
-        response.setTransferId(transferId);
-        response.setStatus(status);
-        response.setTransferType(transferType.toUpperCase());
+        TransferResponse response = transferMapper.toResponse(transfer);
         response.setCommissionApplied(commission + itf);
-
         return response;
     }
     private void saveMovement(String accountId, String transferId, double amount, String type, String description) {
-        Movement m = new Movement();
-        m.setMovementId("MOV-" + idGeneratorService.nextMovementId()); // 8 dígitos con prefijo
-        m.setAccountId(accountId);
-        m.setTransferId(transferId);
-        m.setAmount(amount);
-        m.setType(type);
-        m.setDescription(description);
-        m.setMovementDt(LocalDateTime.now());
-        movementRepository.save(m);
+        var movement = movementMapper.toMovement(
+                "MOV-" + idGeneratorService.nextMovementId(),
+                accountId,
+                transferId,
+                amount, // autoboxing a Double
+                type,
+                description,
+                LocalDateTime.now()
+        );
+        movementRepository.save(movement);
     }
 
     private String determineTransferType(LocalDateTime dt) {
