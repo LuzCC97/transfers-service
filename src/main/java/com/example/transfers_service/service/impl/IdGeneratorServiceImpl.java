@@ -1,28 +1,19 @@
 package com.example.transfers_service.service.impl;
 
-import com.example.transfers_service.repository.MovementRepository;
-import com.example.transfers_service.repository.TransferRepository;
 import com.example.transfers_service.service.IdGeneratorService;
+import com.github.f4b6a3.ulid.UlidCreator;
 import org.springframework.stereotype.Service;
 
 @Service
 public class IdGeneratorServiceImpl implements IdGeneratorService {
-    private final MovementRepository movementRepository;
-    private final TransferRepository transferRepository;
-
-    public IdGeneratorServiceImpl(MovementRepository movementRepository,
-                                  TransferRepository transferRepository) {
-        this.movementRepository = movementRepository;
-        this.transferRepository = transferRepository;
-    }
 
     @Override
     public String nextMovementId() {
-        return movementRepository.nextMovementId();
+        return UlidCreator.getUlid().toString(); // p.ej. 01JDXQ5G8W9V1Z3M7Q9H4M0R2S
     }
 
     @Override
     public String nextTransferId() {
-        return transferRepository.nextTransferId();
+        return UlidCreator.getUlid().toString();
     }
 }
