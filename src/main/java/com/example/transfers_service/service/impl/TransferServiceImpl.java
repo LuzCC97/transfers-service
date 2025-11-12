@@ -57,10 +57,9 @@ public class TransferServiceImpl implements TransferService {
         // 2) Monedas
         String sourceCurrency = sourceAccountEntity.getCurrency();                 // moneda nativa origen
         String destCurrency   = request.getDestinationAccount().getCurrency();     // moneda nativa destino
-        String userCurrency   = request.getTransferData().getCurrency();           // moneda elegida por el cliente
 
         // 2.1) Validar monedas soportadas
-        for (String cur : new String[]{sourceCurrency, destCurrency, userCurrency}) {
+        for (String cur : new String[]{sourceCurrency, destCurrency}) {
             if (!cur.equalsIgnoreCase(CUR_PEN) && !cur.equalsIgnoreCase(CUR_USD)) {
                 throw new IllegalArgumentException("Moneda no soportada: " + cur);
             }
@@ -73,24 +72,24 @@ public class TransferServiceImpl implements TransferService {
         double debitRate=0.0;
         String currencyDest=request.getDestinationAccount().getCurrency();
 
-        if(userCurrency.equalsIgnoreCase(sourceCurrency) && userCurrency.equalsIgnoreCase(currencyDest)){
+        if(destCurrency.equalsIgnoreCase(sourceCurrency)){
             debitSide = "NA";
             debitRate = 1.0;
-        } else if (userCurrency.equalsIgnoreCase(CUR_PEN)) {
-            if(sourceCurrency.equalsIgnoreCase(CUR_USD) &&  currencyDest.equalsIgnoreCase(CUR_PEN)){
+        } else if (sourceCurrency.equalsIgnoreCase(CUR_PEN)) {
+            if(destCurrency.equalsIgnoreCase(CUR_USD) ){
+                // Cliente envía USD desde cuenta en PEN: banco vende USD => VENTA (PEN = USD * 3.80)
+                userAmount = round2(userAmount * FX_VENTA);
+                debitSide = "VENTA";
+                debitRate = FX_VENTA;
+
+            }
+        } else if (sourceCurrency.equalsIgnoreCase(CUR_USD)) {
+            if(destCurrency.equalsIgnoreCase(CUR_PEN)){
 
                 // Cliente envía PEN desde cuenta en USD: banco compra USD => COMPRA (USD = PEN / 3.50)
                 userAmount = round2(userAmount / FX_COMPRA);
                 debitSide = "COMPRA";
                 debitRate = FX_COMPRA;
-            }
-        } else if (userCurrency.equalsIgnoreCase(CUR_USD)) {
-            if(sourceCurrency.equalsIgnoreCase(CUR_PEN) &&  currencyDest.equalsIgnoreCase(CUR_USD)){
-
-                // Cliente envía USD desde cuenta en PEN: banco vende USD => VENTA (PEN = USD * 3.80)
-                userAmount = round2(userAmount * FX_VENTA);
-                debitSide = "VENTA";
-                debitRate = FX_VENTA;
             }
         }
 
@@ -104,7 +103,18 @@ public class TransferServiceImpl implements TransferService {
 
         // 6) Costos en moneda origen
         double commission = transferType.equalsIgnoreCase("ONLINE") ? 2.00 : 1.00;
-        double itf = userAmount * 0.00005;
+
+        // Elegibilidad del ITF según la moneda y el monto que eligió el cliente (sin convertir)
+
+        boolean appliesItf = false;
+            if ("PEN".equalsIgnoreCase(sourceCurrency)) {
+                appliesItf = userAmount >= 2000.00;
+            } else if ("USD".equalsIgnoreCase(sourceCurrency)) {
+                appliesItf = userAmount >= 500.00;
+            }
+
+// ITF se calcula sobre el monto a debitar en moneda de la cuenta origen (userAmount)
+        double itf = appliesItf ? userAmount * 0.00005 : 0.0;
 
         // 4) Validar saldo (se debita amountInSource en moneda origen)
         if (sourceAccountEntity.getBalance() == null || sourceAccountEntity.getBalance() < (userAmount+commission+itf)) {
@@ -125,8 +135,8 @@ public class TransferServiceImpl implements TransferService {
         String transferId = "TRX-" + idGeneratorService.nextTransferId();
 
         String baseDesc = transferData.getDescription();
-        String descInput = String.format(" | INPUT %.2f %s -> DEBIT %.2f %s (FX %s %.2f)",
-                userAmount, userCurrency.toUpperCase(),
+        String descInput = String.format(" | Se envió %.2f %s -> Se debitó %.2f %s (T.C %s %.2f)",
+                request.getTransferData().getAmount(), destCurrency.toUpperCase(),
                 userAmount, sourceCurrency.toUpperCase(),
                 debitSide, debitRate);
         //CAMBIAR A MAPSTRUCT (LESS)
@@ -149,8 +159,9 @@ public class TransferServiceImpl implements TransferService {
         // 10) Movimientos OUT (moneda origen): transferencia íntegra + costos aparte
         saveMovement(sourceAccountId, transferId, -transferAmount, "OUT", "monto transferencia");
         saveMovement(sourceAccountId, transferId, -commission, "OUT", "comisión por transferencia " + transferType);
-        saveMovement(sourceAccountId, transferId, -itf, "OUT", "ITF");
-
+        if (itf > 0.0) {
+            saveMovement(sourceAccountId, transferId, -itf, "OUT", "ITF");
+        }
         // 11) Crédito a destino si la cuenta es interna (en su moneda nativa)
         accountRepository.findAndLockByAccountId(destAccount.getAccountId()).ifPresent(destEntity -> {
             if (!destEntity.getCurrency().equalsIgnoreCase(destCurrency)) {
