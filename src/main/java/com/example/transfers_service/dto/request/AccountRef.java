@@ -10,8 +10,4 @@ public class AccountRef {
 
     @NotBlank(message = "El accountId es obligatorio")
     private String accountId;
-
-    // puede ser opcional, pero si lo quieres obligatorio:
-    @NotBlank(message = "La moneda es obligatoria")
-    private String currency;
 }
