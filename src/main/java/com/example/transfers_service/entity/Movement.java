@@ -25,6 +25,9 @@ public class Movement {
     @Column(name = "amount", nullable = false)
     private Double amount;
 
+    @Column(name = "currency", length = 3, nullable = false)
+    private String currency;
+
     @Column(name = "type", length = 30, nullable = false)
     private String type; // OUT para cargos, IN para abonos
 

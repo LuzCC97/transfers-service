@@ -13,6 +13,7 @@ public interface MovementMapper {
             String accountId,
             String transferId,
             Double amount,
+            String currency,
             String type,
             String description,
             LocalDateTime movementDt
