@@ -83,7 +83,7 @@ public class TransferServiceImpl implements TransferService {
         // Si es interna, obtengo la entidad
         var destinyAccountEntity = destinyAccountEntityOpt.orElse(null);
 
-        // 3) Monedas
+        // 3) Monedas--------------------------------------------
         String sourceCurrency = sourceAccountEntity.getCurrency();
         String destCurrency = destinyIsExternal ? externalDestAccount.getCurrency() : destinyAccountEntity.getCurrency();
         String userCurrency = request.getTransferData().getCurrency();
@@ -268,7 +268,7 @@ public class TransferServiceImpl implements TransferService {
     // ---------- EXTERNAL ACCOUNT PLACEHOLDER ----------
 
     // POJO simple para info mínima que esperamos del servicio externo
-    private static class ExternalAccountInfo {
+    static class ExternalAccountInfo {
         private final String accountId;
         private final String currency;
 
@@ -285,7 +285,7 @@ public class TransferServiceImpl implements TransferService {
      * Placeholder: busca la cuenta destino en un servicio externo (otro banco).
      * Reemplazar por llamada REST real (WebClient/RestTemplate) que retorne la moneda y validez.
      */
-    private Optional<ExternalAccountInfo> fetchExternalAccount(String accountId) {
+    Optional<ExternalAccountInfo> fetchExternalAccount(String accountId) {
         // TODO: implementar cliente REST que llame al endpoint del otro banco y devuelva la moneda, p.e. {"accountId":"...","currency":"PEN"}
         // Por ahora devolvemos Optional.empty() para indicar que no existe externamente.
         return Optional.empty();
