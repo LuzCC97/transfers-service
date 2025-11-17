@@ -52,11 +52,10 @@ class GlobalExceptionHandlerTest {
     @Test
     void handleGeneric_returnsInternalServerError() {
         Exception ex = new Exception("Algo falló");
-        ResponseEntity<?> response = handler.handleGeneric(ex);
+        ResponseEntity<Map<String, Object>> response = handler.handleGeneric(ex);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-        @SuppressWarnings("unchecked")
-        Map<String,Object> body = (Map<String, Object>) response.getBody();
+        Map<String, Object> body = response.getBody();
         assertThat(body).containsEntry("error", "error interno");
         assertThat(body).containsEntry("message", "Algo falló");
     }
