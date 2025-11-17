@@ -63,6 +63,12 @@ public class TransferServiceImpl implements TransferService {
                 request.getSourceAccount().getAccountId()
         );
 
+        // 1.1) Validar que la cuenta origen pertenezca al cliente del JSON
+        validateSourceAccountOwner(
+                sourceAccountEntity,
+                request.getCustomer()
+        );
+
         // 2) Destino (interno o externo)
         DestinationData destinationData = resolveDestinationAccount(
                 request.getDestinationAccount().getAccountId()
@@ -142,6 +148,30 @@ public class TransferServiceImpl implements TransferService {
         return accountRepository.findAndLockByAccountId(sourceAccountId)
                 .orElseThrow(() -> new RuntimeException("Cuenta no existe: " + sourceAccountId));
     }
+
+    //2.3 Validar que la cuenta origen pertenezca al cliente del JSON
+    private void validateSourceAccountOwner(
+            com.example.transfers_service.entity.Account sourceAccountEntity,
+            com.example.transfers_service.dto.request.CustomerRef customerRef
+    ) {
+        if (customerRef == null) {
+            throw new IllegalArgumentException("La información del cliente es obligatoria.");
+        }
+
+        String customerIdFromRequest = customerRef.getCustomerId();
+        if (customerIdFromRequest == null || customerIdFromRequest.isBlank()) {
+            throw new IllegalArgumentException("El customerId del request es obligatorio.");
+        }
+
+        String accountCustomerId = sourceAccountEntity.getCustomerId();
+        if (accountCustomerId == null || !accountCustomerId.equals(customerIdFromRequest)) {
+            throw new IllegalArgumentException(
+                    "La cuenta origen no pertenece al cliente indicado en la solicitud."
+            );
+        }
+    }
+
+
     //2.2. Clase para encapsular información del destino
     private static class DestinationData {
         private final boolean external;
@@ -241,7 +271,7 @@ public class TransferServiceImpl implements TransferService {
                 .setScale(SCALE + 4, RoundingMode.HALF_UP);
     }
     //2.7. Clase para encapsular los cargos (comisión, ITF, total, tipo)
-    private static class ChargesData {
+    public static class ChargesData {
         private final String transferType;
         private final BigDecimal commission;
         private final BigDecimal itf;
