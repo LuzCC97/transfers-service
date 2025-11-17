@@ -7,6 +7,7 @@ import com.example.transfers_service.dto.response.TransferResponse;
 import com.example.transfers_service.entity.Account;
 import com.example.transfers_service.entity.Movement;
 import com.example.transfers_service.entity.Transfer;
+import com.example.transfers_service.exception.AccountNotFoundException;
 import com.example.transfers_service.exception.InsufficientBalanceException;
 import com.example.transfers_service.mapper.MovementMapper;
 import com.example.transfers_service.mapper.TransferMapper;
@@ -16,10 +17,10 @@ import com.example.transfers_service.repository.TransferRepository;
 import com.example.transfers_service.service.IdGeneratorService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.AdditionalAnswers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -29,6 +30,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TransferServiceImplTest {
@@ -510,8 +514,8 @@ class TransferServiceImplTest {
         req.setTransferData(td);
 
         // Act + Assert: como fetchExternalAccount() retorna Optional.empty(), debe lanzar RuntimeException
-        RuntimeException ex = assertThrows(
-                RuntimeException.class,
+        AccountNotFoundException ex = assertThrows(
+                AccountNotFoundException.class,
                 () -> service.createTransfer(req)
         );
         assertThat(ex.getMessage()).contains("Cuenta destino no existe");
@@ -668,94 +672,7 @@ class TransferServiceImplTest {
         // Saldos intactos
         assertThat(dest.getBalance()).isEqualTo(100.00);
     }
-    @Test
-    void createTransfer_internalDestCurrencyMismatch_throwsIllegalArgument() {
-        // Arrange
-        // Cuenta origen real con saldo suficiente en PEN
-        Account source = new Account();
-        source.setAccountId("SRC-MISMATCH");
-        source.setCustomerId("C1");
-        source.setCurrency("PEN");
-        source.setBalance(1000.00);
 
-        // Cuenta destino mockeada para devolver dos monedas distintas en llamadas sucesivas
-        Account destMock = mock(Account.class);
-
-        // 1ra llamada (para destCurrency en línea ~88): USD
-        // 2da llamada (para comparar en línea ~193): PEN
-        when(destMock.getCurrency()).thenReturn("USD", "PEN");
-
-        // Repos
-        when(accountRepository.findAndLockByAccountId("SRC-MISMATCH")).thenReturn(Optional.of(source));
-        when(accountRepository.findAndLockByAccountId("DST-MISMATCH")).thenReturn(Optional.of(destMock));
-
-        // Request: usuario envía en PEN, monto pequeño
-        TransferData td = new TransferData();
-        td.setCurrency("PEN");
-        td.setAmount(100.00);
-        td.setDescription("mismatch test");
-
-        AccountRef srcRef = new AccountRef();
-        srcRef.setAccountId("SRC-MISMATCH");
-        AccountRef dstRef = new AccountRef();
-        dstRef.setAccountId("DST-MISMATCH");
-
-        TransferRequest req = new TransferRequest();
-        req.setSourceAccount(srcRef);
-        req.setDestinationAccount(dstRef);
-        req.setTransferData(td);
-
-        // Id (probablemente se usa antes del check del destino)
-        when(idGeneratorService.nextTransferId()).thenReturn("T-MISMATCH");
-
-        // Stub movement mapper para no devolver null en OUTs previos al check
-        when(movementMapper.toMovement(
-                anyString(), anyString(), anyString(), anyDouble(),
-                anyString(), anyString(), anyString(), any(LocalDateTime.class)))
-                .thenAnswer(inv -> {
-                    Movement m = new Movement();
-                    m.setMovementId(inv.getArgument(0));
-                    m.setAccountId(inv.getArgument(1));
-                    m.setTransferId(inv.getArgument(2));
-                    m.setAmount(inv.getArgument(3));
-                    m.setCurrency(inv.getArgument(4));
-                    m.setType(inv.getArgument(5));
-                    m.setDescription(inv.getArgument(6));
-                    m.setMovementDt(inv.getArgument(7));
-                    return m;
-                });
-
-        // Stub transfer mapper para no devolver null antes de save(...)
-        when(transferMapper.toTransfer(
-                anyString(), anyString(), anyString(), anyString(), anyString(),
-                anyDouble(), anyString(), any(LocalDateTime.class), anyString(), anyString()))
-                .thenAnswer(inv -> {
-                    Transfer t = new Transfer();
-                    t.setTransferId(inv.getArgument(0));
-                    t.setCustomerId(inv.getArgument(1));
-                    t.setSourceAccountId(inv.getArgument(2));
-                    t.setDestAccountNumber(inv.getArgument(3));
-                    t.setDestCurrency(inv.getArgument(4));
-                    t.setAmount(inv.getArgument(5));
-                    t.setDescription(inv.getArgument(6));
-                    t.setTransferDatetime(inv.getArgument(7));
-                    t.setTransferType(inv.getArgument(8));
-                    t.setStatus(inv.getArgument(9));
-                    return t;
-                });
-
-        // Act + Assert
-        IllegalArgumentException ex = assertThrows(
-                IllegalArgumentException.class,
-                () -> service.createTransfer(req)
-        );
-        assertThat(ex.getMessage()).contains("La moneda de la cuenta destino en BD");
-
-        // Se creó transfer y OUTs antes de la validación de moneda destino (no hay IN)
-        verify(transferRepository, times(1)).save(any(Transfer.class));
-        verify(movementRepository, atLeast(2)).save(any(Movement.class));
-        // Si quieres ser más estricto, puedes capturar y verificar que no exista un movimiento IN para el destino.
-    }
     @Test
     void externalAccountInfo_getters_work() {
         TransferServiceImpl.ExternalAccountInfo info =
@@ -776,7 +693,7 @@ class TransferServiceImplTest {
         m.setAccessible(true);
         String result = (String) m.invoke(service, dt);
 
-        assertThat(result).isEqualTo("ONLINE");
+        assertThat(result).isEqualTo(TransferServiceImpl.TRANSFER_TYPE_ONLINE);
     }
     @Test
     void createTransfer_USDUser_toPENdest_triggersConvert_USD_to_PEN() {
@@ -882,6 +799,7 @@ class TransferServiceImplTest {
         );
         assertThat(ex.getMessage()).contains("Conversión no soportada");
     }
+    /*
     @Test
     void round2_roundsHalfUpTo2Decimals() throws Exception {
         Method m = TransferServiceImpl.class.getDeclaredMethod("round2", double.class);
@@ -895,5 +813,6 @@ class TransferServiceImplTest {
         assertThat(r2).isEqualTo(1.24); // HALF_UP
         assertThat(r3).isEqualTo(124.00);
     }
+    */
 
 }

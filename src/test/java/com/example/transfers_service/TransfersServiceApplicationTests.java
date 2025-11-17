@@ -1,26 +1,33 @@
 package com.example.transfers_service;
-
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.test.context.ActiveProfiles;
 
-@SpringBootTest
+import static org.assertj.core.api.Assertions.assertThat;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@ActiveProfiles("test")
 class TransfersServiceApplicationTests {
-
-	@Test
-	void contextLoads() {
-	}
-    //cubriendo porcentaje de lineas
     @Test
-    @Timeout(10) // opcional: evita que quede colgado
-    void main_runs_without_web_server() {
-        String[] args = {
-                "--spring.main.web-application-type=none",
-                "--spring.main.banner-mode=off"
-        };
-        TransfersServiceApplication.main(args);
-        // Si no lanza excepción, se cubre SpringApplication.run(...) y el cierre del método.
+    void contextLoads() {
+        // This test will verify that the application context loads
     }
 
+    @Test
+    void main_runs_without_web_server() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(TransfersServiceApplication.class)
+                .withPropertyValues(
+                        "spring.datasource.driver-class-name=org.h2.Driver",
+                        "spring.datasource.url=jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
+                        "spring.datasource.username=sa",
+                        "spring.datasource.password=",
+                        "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect"
+                )
+                .run(context -> {
+                    assertThat(context).isNotNull();
+                    assertThat(context).hasNotFailed();
+                });
+    }
 }

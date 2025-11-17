@@ -29,7 +29,6 @@ class GlobalExceptionHandlerTest {
         when(bindingResult.getAllErrors()).thenReturn(List.of(fe1, fe2));
 
         // El constructor de MethodArgumentNotValidException requiere Method y BindingResult
-        Method m = Sample.class.getDeclaredMethod("dummy", String.class);
         MethodArgumentNotValidException ex = new MethodArgumentNotValidException(null, bindingResult);
 
         ResponseEntity<Map<String, String>> response = handler.handleValidationErrors(ex);
@@ -62,6 +61,12 @@ class GlobalExceptionHandlerTest {
 
     // Clase dummy solo para obtener un Method si lo necesitas en otros enfoques
     private static class Sample {
-        public void dummy(String s) {}
+        /**
+         * Empty method used as a placeholder for testing exception handling.
+         * This method doesn't need an implementation as it's only used to test exception scenarios.
+         */
+        public void dummy(String s) {
+            // Intentionally left empty for testing purposes
+        }
     }
 }

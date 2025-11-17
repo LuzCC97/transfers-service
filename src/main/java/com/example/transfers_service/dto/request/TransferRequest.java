@@ -1,7 +1,6 @@
 package com.example.transfers_service.dto.request;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
