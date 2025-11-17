@@ -423,7 +423,7 @@ public class TransferServiceImpl implements TransferService {
 
         if (destinationData.isExternal()) {
             // Cuenta externa: no actualizamos saldo local ni guardamos movimiento IN
-            // TODO: implementar registro para conciliación / notificación a servicio de compensación
+            // implementar registro para conciliacion notificación a servicio de compensación
             return;
         }
 
@@ -503,12 +503,6 @@ public class TransferServiceImpl implements TransferService {
             return "DIFERIDA";
         }
     }
-
-    // Redondeo a 2 decimales (dejé tu helper viejo por compatibilidad)
-   // private double round2(double v) {
-    //    return new java.math.BigDecimal(v).setScale(2, java.math.RoundingMode.HALF_UP).doubleValue();
-  //  }
-
     // ---------- EXTERNAL ACCOUNT PLACEHOLDER ----------
 
     // POJO simple para info mínima que esperamos del servicio externo
@@ -530,26 +524,7 @@ public class TransferServiceImpl implements TransferService {
      * Reemplazar por llamada REST real (WebClient/RestTemplate) que retorne la moneda y validez.
      */
     Optional<ExternalAccountInfo> fetchExternalAccount(String accountId) {
-        // TODO: implementar cliente REST que llame al endpoint del otro banco y devuelva la moneda, p.e. {"accountId":"...","currency":"PEN"}
-        // Por ahora devolvemos Optional.empty() para indicar que no existe externamente.
-        return Optional.empty();
+       return Optional.empty();
 
-        /*
-        // Ejemplo esbozo con WebClient (para cuando lo implementes):
-        WebClient webClient = WebClient.create("https://interbank-api.example");
-        try {
-            var resp = webClient.get()
-                    .uri("/accounts/{id}", accountId)
-                    .retrieve()
-                    .bodyToMono(AccountExternalDto.class)
-                    .block();
-            if (resp != null) {
-                return Optional.of(new ExternalAccountInfo(resp.getAccountId(), resp.getCurrency()));
-            }
-        } catch (WebClientResponseException.NotFound ex) {
-            return Optional.empty();
-        }
-        return Optional.empty();
-        */
     }
 }

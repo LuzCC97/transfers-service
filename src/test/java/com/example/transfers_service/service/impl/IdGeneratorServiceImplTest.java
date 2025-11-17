@@ -20,8 +20,9 @@ class IdGeneratorServiceImplTest {
     void nextMovementId_returnsValidUlid() {
         String id = service.nextMovementId();
 
-        assertThat(id).isNotNull();
-        assertThat(id.length()).isEqualTo(26);
+        assertThat(id)
+                .isNotNull()
+                .hasSize(26);
         assertThat(ULID_PATTERN.matcher(id).matches())
                 .as("Debe cumplir formato ULID (26 chars Crockford Base32)")
                 .isTrue();
@@ -31,8 +32,9 @@ class IdGeneratorServiceImplTest {
     void nextTransferId_returnsValidUlid() {
         String id = service.nextTransferId();
 
-        assertThat(id).isNotNull();
-        assertThat(id.length()).isEqualTo(26);
+        assertThat(id)
+                .isNotNull()
+                .hasSize(26);
         assertThat(ULID_PATTERN.matcher(id).matches())
                 .as("Debe cumplir formato ULID (26 chars Crockford Base32)")
                 .isTrue();
@@ -47,12 +49,14 @@ class IdGeneratorServiceImplTest {
             ids.add(service.nextTransferId());
         }
         // Deberíamos tener 400 IDs únicos
-        assertThat(ids).hasSize(400);
-        // Y todos deben tener formato válido
-        assertThat(ids).allSatisfy(id -> {
-            assertThat(id.length()).isEqualTo(26);
-            assertThat(ULID_PATTERN.matcher(id).matches()).isTrue();
-        });
+        assertThat(ids)
+                .hasSize(400)
+                .allSatisfy(id -> {
+                    assertThat(id)
+                            .hasSize(26);
+                    assertThat(ULID_PATTERN.matcher(id).matches())
+                            .isTrue();
+                });
     }
 
     @Test

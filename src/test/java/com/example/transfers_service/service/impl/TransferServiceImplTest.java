@@ -799,20 +799,6 @@ class TransferServiceImplTest {
         );
         assertThat(ex.getMessage()).contains("Conversión no soportada");
     }
-    /*
-    @Test
-    void round2_roundsHalfUpTo2Decimals() throws Exception {
-        Method m = TransferServiceImpl.class.getDeclaredMethod("round2", double.class);
-        m.setAccessible(true);
 
-        double r1 = (double) m.invoke(service, 1.234);
-        double r2 = (double) m.invoke(service, 1.235);
-        double r3 = (double) m.invoke(service, 123.999);
-
-        assertThat(r1).isEqualTo(1.23);
-        assertThat(r2).isEqualTo(1.24); // HALF_UP
-        assertThat(r3).isEqualTo(124.00);
-    }
-    */
 
 }

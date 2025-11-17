@@ -20,7 +20,7 @@ class GlobalExceptionHandlerTest {
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
     @Test
-    void handleValidationErrors_returnsBadRequestWithFieldMessages() throws NoSuchMethodException {
+    void handleValidationErrors_returnsBadRequestWithFieldMessages()  {
         // Simular MethodArgumentNotValidException con FieldErrors
         //Para MethodArgumentNotValidException usamos un BindingResult mock que devuelve una lista de FieldError
         BindingResult bindingResult = mock(BindingResult.class);
@@ -55,8 +55,9 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         Map<String, Object> body = response.getBody();
-        assertThat(body).containsEntry("error", "error interno");
-        assertThat(body).containsEntry("message", "Algo falló");
+        assertThat(body)
+                .containsEntry("error", "error interno")
+                .containsEntry("message", "Algo falló");
     }
 
     // Clase dummy solo para obtener un Method si lo necesitas en otros enfoques
