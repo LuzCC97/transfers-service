@@ -47,6 +47,8 @@ class TransferServiceImplTest {
     @InjectMocks
     TransferServiceImpl service;
 
+    //Verifica que una transferencia interna en la misma moneda se realice correctamente sin aplicar el ITF
+    //Caso de prueba: Transferencia entre cuentas en PEN
     @Test
     void createTransfer_internalSameCurrency_noITF() {
         // Arrange
@@ -150,6 +152,9 @@ class TransferServiceImplTest {
         verify(accountRepository, times(2)).findAndLockByAccountId(anyString());
         verifyNoMoreInteractions(transferRepository, movementRepository);
     }
+
+    //Propósito: Comprueba que se aplique correctamente el ITF al transferir de PEN a USD.
+    //Caso de prueba: Transferencia desde una cuenta en PEN a una en USD.
     @Test
     void createTransfer_PENtoUSD_ITFapplies() {
         // Arrange
@@ -264,6 +269,9 @@ class TransferServiceImplTest {
         verify(accountRepository, times(2)).findAndLockByAccountId(anyString());
         verifyNoMoreInteractions(transferRepository, movementRepository);
     }
+
+    //Propósito: Verifica que se aplique el ITF al transferir de USD a PEN.
+    //Caso de prueba: Transferencia desde una cuenta en USD a una en PEN.
     @Test
     void createTransfer_USDtoPEN_ITFapplies() {
         // Arrange
@@ -387,7 +395,8 @@ class TransferServiceImplTest {
         verifyNoMoreInteractions(transferRepository, movementRepository);
     }
 
-
+    //Propósito: Asegura que se lance una excepción cuando no hay saldo suficiente.
+    //Caso de prueba: Intento de transferir más dinero del disponible en la cuenta de origen.
     @Test
     void createTransfer_insufficientBalance_throwsException() {
         // Arrange
@@ -435,6 +444,9 @@ class TransferServiceImplTest {
         assertThat(source.getBalance()).isEqualTo(50.00);
         assertThat(dest.getBalance()).isEqualTo(100.00);
     }
+
+    //Propósito: Verifica que se lance una excepción al intentar hacer una transferencia con una moneda no soportada.
+    //Caso de prueba: Intento de transferencia con moneda no soportada.
     @Test
     void createTransfer_unsupportedCurrency_throwsIllegalArgument() {
         // Arrange
@@ -484,6 +496,9 @@ class TransferServiceImplTest {
         assertThat(source.getBalance()).isEqualTo(1000.00);
         assertThat(dest.getBalance()).isEqualTo(200.00);
     }
+
+    //Propósito: Comprueba el manejo de errores cuando la cuenta destino no existe.
+    //Caso de prueba: Intento de transferencia a una cuenta que no existe.
     @Test
     void createTransfer_destinationNotFound_throwsRuntimeException() {
         // Arrange
@@ -527,6 +542,8 @@ class TransferServiceImplTest {
         // No cambia el saldo
         assertThat(source.getBalance()).isEqualTo(1000.00);
     }
+    //Propósito: Verifica el comportamiento con cuentas externas.
+    //Caso de prueba: Transferencia a una cuenta externa.
     @Test
     void createTransfer_externalDestination_setsPendingExterno_andNoInMovement() {
         // Arrange
@@ -625,6 +642,9 @@ class TransferServiceImplTest {
         verify(movementRepository, times(2)).save(any(Movement.class));
         verifyNoMoreInteractions(movementRepository);
     }
+
+    //Propósito: Asegura que se maneje correctamente cuando el saldo de la cuenta de origen es nulo.
+    //Caso de prueba: Intento de transferencia desde una cuenta con saldo nulo.
     @Test
     void createTransfer_nullSourceBalance_throwsInsufficientBalance() {
         // Arrange
@@ -673,6 +693,8 @@ class TransferServiceImplTest {
         assertThat(dest.getBalance()).isEqualTo(100.00);
     }
 
+    //Propósito: Prueba los getters de la clase interna ExternalAccountInfo.
+    //Caso de prueba: Creación y consulta de una instancia de ExternalAccountInfo.
     @Test
     void externalAccountInfo_getters_work() {
         TransferServiceImpl.ExternalAccountInfo info =
@@ -682,19 +704,23 @@ class TransferServiceImplTest {
         assertThat(info.getCurrency()).isEqualTo("USD");
     }
 
-
+    //Propósito: Verifica que se determine correctamente el tipo de transferencia como ONLINE dentro del horario laboral.
+    //Caso de prueba: Lunes a las 10:00 AM.
     @Test
     void determineTransferType_returns_ONLINE_inBusinessHour() throws Exception {
         // Lunes 10:00am (día hábil y dentro de horario)
         LocalDateTime dt = LocalDateTime.of(2025, 11, 10, 10, 0); // Monday
 
-        // Acceder al método privado por reflexión
+        // Acceder al metodo privado por reflexión
         Method m = TransferServiceImpl.class.getDeclaredMethod("determineTransferType", LocalDateTime.class);
         m.setAccessible(true);
         String result = (String) m.invoke(service, dt);
 
         assertThat(result).isEqualTo(TransferServiceImpl.TRANSFER_TYPE_ONLINE);
     }
+
+    //Propósito: Comprueba la conversión de moneda de USD a PEN.
+    //Caso de prueba: Transferencia desde una cuenta en USD a una en PEN.
     @Test
     void createTransfer_USDUser_toPENdest_triggersConvert_USD_to_PEN() {
         Account source = new Account();
@@ -775,6 +801,9 @@ class TransferServiceImplTest {
         // amountToCredit = 100 USD * 3.50 = 350.00 PEN (cubre línea 224)
         assertThat(dest.getBalance()).isEqualTo(10.00 + 350.00);
     }
+
+    //Propósito: Verifica que se lance una excepción al intentar convertir entre monedas no soportadas.
+    //Caso de prueba: Intento de conversión entre un par de monedas no soportado.
     @Test
     void convert_unsupportedPair_throwsIllegalArgumentException() throws Exception {
         Method m = TransferServiceImpl.class.getDeclaredMethod(
@@ -798,6 +827,44 @@ class TransferServiceImplTest {
                 }
         );
         assertThat(ex.getMessage()).contains("Conversión no soportada");
+    }
+
+    //Verifica que se lance una excepción cuando la cuenta de origen no existe.
+    // Caso de prueba: Intento de transferencia desde una cuenta que no existe.
+    @Test
+    void createTransfer_sourceAccountNotFound_throwsRuntimeException() {
+        // Arrange
+        // Configurar request con cuenta origen que no existe
+        TransferData td = new TransferData();
+        td.setCurrency("PEN");
+        td.setAmount(100.00);
+        td.setDescription("PAGO");
+
+        AccountRef srcRef = new AccountRef();
+        srcRef.setAccountId("CUENTA_INEXISTENTE");
+        AccountRef dstRef = new AccountRef();
+        dstRef.setAccountId("A2");
+
+        TransferRequest req = new TransferRequest();
+        req.setSourceAccount(srcRef);
+        req.setDestinationAccount(dstRef);
+        req.setTransferData(td);
+
+        // Configurar repositorio para devolver Optional.empty() para la cuenta origen
+        when(accountRepository.findAndLockByAccountId("CUENTA_INEXISTENTE"))
+                .thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(RuntimeException.class, () -> {
+            service.createTransfer(req);
+        }, "Debe lanzar RuntimeException cuando la cuenta origen no existe");
+
+        // Verificar que se intentó buscar la cuenta origen
+        verify(accountRepository).findAndLockByAccountId("CUENTA_INEXISTENTE");
+        // Verificar que no se intentó buscar la cuenta destino
+        verify(accountRepository, never()).findAndLockByAccountId("A2");
+        // Verificar que no se guardó ninguna transferencia ni movimiento
+        verifyNoInteractions(transferRepository, movementRepository);
     }
 
 

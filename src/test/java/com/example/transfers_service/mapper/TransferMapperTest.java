@@ -13,7 +13,7 @@ class TransferMapperTest {
 
     private final TransferMapper mapper = Mappers.getMapper(TransferMapper.class);
 
-    //toTransfer(...) valida que todos los campos del metodo queden en la entidad Transfer
+    //toTransfer_mapsAllFields: Verifica el mapeo completo de todos los campos a la entidad Transfer.
     @Test
     void toTransfer_mapsAllFields() {
         String transferId = "TRX-123";
@@ -46,7 +46,7 @@ class TransferMapperTest {
         assertThat(t.getStatus()).isEqualTo(status);
     }
 
-    //toResponse(...)valida que solo los campos especificados por tus Mapping lleguen al DTO. Es normal que commissionApplied sea null aquí; el servicio lo asigna.
+    //toResponse_mapsSelectedFieldsFromEntity: Comprueba que solo los campos seleccionados se mapeen al DTO de respuesta.
     @Test
     void toResponse_mapsSelectedFieldsFromEntity() {
         Transfer t = new Transfer();
@@ -65,7 +65,7 @@ class TransferMapperTest {
         // commissionApplied no lo mapea el mapper; lo setea el servicio (puede quedar null aquí)
         assertThat(r.getCommissionApplied()).isNull();
     }
-    //Este test valida que, con fuente null, el mapper devuelve null.
+    //toTransfer_allNullParams_returnsNull: Verifica el comportamiento con todos los parámetros nulos.
     @Test
     void toTransfer_allNullParams_returnsNull() {
         Transfer t = mapper.toTransfer(
@@ -73,6 +73,7 @@ class TransferMapperTest {
         );
         assertThat(t).isNull();
     }
+    //toTransfer_allowsSomeNullFields_andCreatesEntity: Comprueba el mapeo con algunos campos nulos.
     @Test
     void toTransfer_allowsSomeNullFields_andCreatesEntity() {
         Transfer t = mapper.toTransfer(
@@ -99,6 +100,7 @@ class TransferMapperTest {
         assertThat(t.getTransferType()).isNull();
         assertThat(t.getStatus()).isNull();
     }
+    //toResponse_nullSource_returnsNull: Verifica el comportamiento cuando la fuente es nula.
     @Test
     void toResponse_nullSource_returnsNull() {
         TransferResponse r = mapper.toResponse(null);

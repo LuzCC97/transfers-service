@@ -12,6 +12,7 @@ class MovementMapperTest {
 
     private final MovementMapper mapper = Mappers.getMapper(MovementMapper.class);
 
+    //toMovement_mapsAllFields: Verifica que todos los campos se mapeen correctamente al convertir a entidad Movement.
     @Test
     void toMovement_mapsAllFields() {
         String movementId = "MOV-123";
@@ -37,6 +38,7 @@ class MovementMapperTest {
         assertThat(m.getDescription()).isEqualTo(description);
         assertThat(m.getMovementDt()).isEqualTo(dt);
     }
+    //toMovement_allNullParams_returnsNull: Comprueba el comportamiento cuando todos los parámetros son nulos.
     @Test
     void toMovement_allNullParams_returnsNull() {
         Movement m = mapper.toMovement(

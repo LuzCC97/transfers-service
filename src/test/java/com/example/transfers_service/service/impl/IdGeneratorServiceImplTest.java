@@ -16,6 +16,7 @@ class IdGeneratorServiceImplTest {
     private static final Pattern ULID_PATTERN =
             Pattern.compile("^[0-9A-HJKMNP-TV-Z]{26}$");
 
+    //nextMovementId_returnsValidUlid: Verifica que se genere un ID de movimiento válido en formato ULID.
     @Test
     void nextMovementId_returnsValidUlid() {
         String id = service.nextMovementId();
@@ -28,6 +29,7 @@ class IdGeneratorServiceImplTest {
                 .isTrue();
     }
 
+    //nextTransferId_returnsValidUlid: Verifica que se genere un ID de transferencia válido en formato ULID.
     @Test
     void nextTransferId_returnsValidUlid() {
         String id = service.nextTransferId();
@@ -40,6 +42,7 @@ class IdGeneratorServiceImplTest {
                 .isTrue();
     }
 
+    //generatesUniqueIds_acrossMultipleCalls: Comprueba que se generen IDs únicos en múltiples llamadas.
     @Test
     void generatesUniqueIds_acrossMultipleCalls() {
         // Verificar unicidad con un número razonable de llamadas
@@ -59,6 +62,7 @@ class IdGeneratorServiceImplTest {
                 });
     }
 
+    //movementAndTransferIds_canDiffer: Verifica que los IDs de movimiento y transferencia sean diferentes entre sí.
     @Test
     void movementAndTransferIds_canDiffer() {
         // No garantizamos semántica distinta, pero usualmente serán diferentes

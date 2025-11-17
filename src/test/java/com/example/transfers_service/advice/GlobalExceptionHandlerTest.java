@@ -19,6 +19,7 @@ class GlobalExceptionHandlerTest {
 
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
+    //handleValidationErrors_returnsBadRequestWithFieldMessages: Verifica el manejo de errores de validación.
     @Test
     void handleValidationErrors_returnsBadRequestWithFieldMessages()  {
         // Simular MethodArgumentNotValidException con FieldErrors
@@ -38,6 +39,7 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody()).containsEntry("transferData.currency", "La moneda es obligatoria");
     }
 
+    //handleInsufficientBalance_returnsBadRequest: Comprueba el manejo de excepciones de saldo insuficiente.
     @Test
     void handleInsufficientBalance_returnsBadRequest() {
         InsufficientBalanceException ex = new InsufficientBalanceException("Saldo insuficiente. Detalle");
@@ -48,6 +50,7 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody()).containsEntry("message", "Saldo insuficiente. Detalle");
     }
 
+    //handleGeneric_returnsInternalServerError: Verifica el manejo de excepciones genéricas.
     @Test
     void handleGeneric_returnsInternalServerError() {
         Exception ex = new Exception("Algo falló");

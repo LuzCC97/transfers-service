@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -30,9 +29,10 @@ class TransferControllerTest {
     private ObjectMapper objectMapper;
 
     //Declaro MockBean del TransferService.
-    @MockBean
+    @org.springframework.boot.test.mock.mockito.MockBean
     private TransferService transferService;
 
+    //createTransfer_returns201AndBody: Verifica que al crear una transferencia exitosamente se devuelva un código 201 con los datos de la transferencia.
     @Test
     void createTransfer_returns201AndBody() throws Exception {
         // Mock service response
@@ -62,6 +62,7 @@ class TransferControllerTest {
                 .andExpect(jsonPath("$.commissionApplied", is(2.11)));
     }
 
+    //createTransfer_validationError_returns400WithFieldMessages: Valida que se devuelva un error 400 con mensajes de validación cuando los datos de la transferencia son inválidos.
     @Test
     void createTransfer_validationError_returns400WithFieldMessages() throws Exception {
         // Falta sourceAccount.accountId y transferData.amount
