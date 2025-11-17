@@ -5,6 +5,7 @@ import com.example.transfers_service.dto.response.TransferResponse;
 import com.example.transfers_service.entity.Transfer;
 import com.example.transfers_service.exception.AccountNotFoundException;
 import com.example.transfers_service.exception.InsufficientBalanceException;
+import com.example.transfers_service.mapper.MovementParams;
 import com.example.transfers_service.repository.AccountRepository;
 import com.example.transfers_service.repository.MovementRepository;
 import com.example.transfers_service.repository.TransferRepository;
@@ -505,19 +506,28 @@ public class TransferServiceImpl implements TransferService {
     }
 
     // Guardar movimiento (refactor: usar MovementParams para cumplir regla de Sonar)
-    private void saveMovement(String accountId, String transferId, double amount, String currency, String type, String description) {
-        var movement = movementMapper.toMovement(
-                "MOV-" + idGeneratorService.nextMovementId(),
-                accountId,
-                transferId,
-                amount,
-                currency,
-                type,
-                description,
-                LocalDateTime.now()
-        );
+    private void saveMovement(String accountId,
+                              String transferId,
+                              double amount,
+                              String currency,
+                              String type,
+                              String description) {
+
+        var params = new MovementParams();
+        params.setMovementId("MOV-" + idGeneratorService.nextMovementId());
+        params.setAccountId(accountId);
+        params.setTransferId(transferId);
+        params.setAmount(amount);
+        params.setCurrency(currency);
+        params.setType(type);
+        params.setDescription(description);
+        params.setMovementDt(LocalDateTime.now());
+
+        var movement = movementMapper.toMovement(params);
         movementRepository.save(movement);
     }
+
+
 
     // Determina si la transferencia es ONLINE o DIFERIDA (mantengo tu implementación)
     private String determineTransferType(LocalDateTime dt) {
