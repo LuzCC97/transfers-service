@@ -11,6 +11,7 @@ class TransfersServiceApplicationTests {
 	@Test
 	void contextLoads() {
 	}
+    //cubriendo porcentaje de lineas
     @Test
     @Timeout(10) // opcional: evita que quede colgado
     void main_runs_without_web_server() {
