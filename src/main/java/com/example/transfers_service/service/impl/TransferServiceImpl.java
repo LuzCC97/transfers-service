@@ -249,7 +249,6 @@ public class TransferServiceImpl implements TransferService {
         return BigDecimal.valueOf(request.getTransferData().getAmount())
                 .setScale(SCALE + 4, RoundingMode.HALF_UP);
     }
-
     // 2.6. Cálculo de montos a debitar / acreditar
     private BigDecimal calculateAmountToDebit(BigDecimal amountUser,
                                               String userCurrency,
