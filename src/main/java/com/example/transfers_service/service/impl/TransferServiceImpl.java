@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -291,33 +292,51 @@ public class TransferServiceImpl implements TransferService {
 
     }
 
+    private BigDecimal calculateCommission(BigDecimal amount, String currency) {
+        // Lógica para calcular la comisión
+        // Por ejemplo: $2.00 para transferencias en línea, $1.00 para diferidas
+        return determineTransferType(LocalDateTime.now()) ?
+                new BigDecimal("2.00") :
+                new BigDecimal("1.00");
+    }
+
+    private BigDecimal calculateItf(BigDecimal amount, LocalDateTime dateTime) {
+        // Lógica para calcular el ITF
+        // 0.005% del monto si aplica
+        boolean appliesItf = false;
+        String currency = "PEN"; // O la moneda correspondiente
+
+        if (CUR_PEN.equalsIgnoreCase(currency)) {
+            appliesItf = amount.compareTo(new BigDecimal("2000.00")) >= 0;
+        } else if (CUR_USD.equalsIgnoreCase(currency)) {
+            appliesItf = amount.compareTo(new BigDecimal("500.00")) >= 0;
+        }
+
+        return appliesItf ?
+                amount.multiply(new BigDecimal("0.00005")).setScale(2, RoundingMode.HALF_UP) :
+                BigDecimal.ZERO;
+    }
     // 2.8. Cálculo de tipo, comisión, ITF y total a debitar
     private ChargesData calculateCharges(String sourceCurrency,
                                          BigDecimal amountToDebit,
                                          LocalDateTime dateTime) {
+        // Determinar si es transferencia ONLINE (true) o DIFERIDA (false)
+        boolean isOnline = determineTransferType(dateTime);
 
-        String transferType = determineTransferType(dateTime);
-        BigDecimal commission = transferType.equalsIgnoreCase(TRANSFER_TYPE_ONLINE)
-                ? BigDecimal.valueOf(2.00)
-                : BigDecimal.valueOf(1.00);
+        // Asignar el tipo de transferencia
+        String transferType = isOnline ? TRANSFER_TYPE_ONLINE : "DIFERIDA";
 
-        boolean appliesItf = false;
-        if (CUR_PEN.equalsIgnoreCase(sourceCurrency)) {
-            appliesItf = amountToDebit.compareTo(BigDecimal.valueOf(2000.00)) >= 0;
-        } else if (CUR_USD.equalsIgnoreCase(sourceCurrency)) {
-            appliesItf = amountToDebit.compareTo(BigDecimal.valueOf(500.00)) >= 0;
-        }
+        // Calcular comisión, ITF y total a debitar
+        BigDecimal commission = calculateCommission(amountToDebit, sourceCurrency);
+        BigDecimal itf = calculateItf(amountToDebit, dateTime);
+        BigDecimal totalDebit = amountToDebit.add(commission).add(itf);
 
-        BigDecimal itf = appliesItf
-                ? amountToDebit.multiply(BigDecimal.valueOf(0.00005))
-                : BigDecimal.ZERO;
-
-        BigDecimal totalDebit = amountToDebit
-                .add(commission)
-                .add(itf)
-                .setScale(SCALE, RoundingMode.HALF_UP);
-
-        return new ChargesData(transferType, commission, itf, totalDebit);
+        return new ChargesData(
+                transferType,  // Ahora es un String
+                commission,
+                itf,
+                totalDebit
+        );
     }
 
     // 2.9. Validar y actualizar saldo origen
@@ -377,14 +396,9 @@ public class TransferServiceImpl implements TransferService {
         var dateTime            = buildParams.getDateTime();
         var transferId          = buildParams.getTransferId();
 
-        String status;
-        if (destinationData.isExternal()) {
-            status = "PENDIENTE_EXTERNO";
-        } else {
-            status = chargesData.getTransferType().equalsIgnoreCase(TRANSFER_TYPE_ONLINE)
-                    ? "EJECUTADA"
-                    : "PENDIENTE";
-        }
+        // Cambia las líneas 380-387 por:
+        String status = determineTransferType(dateTime) ? "EJECUTADA" : "PENDIENTE";
+        String transferType = determineTransferType(dateTime) ? TRANSFER_TYPE_ONLINE : "DIFERIDA";
 
         String baseDesc = request.getTransferData().getDescription();
 
@@ -546,18 +560,17 @@ public class TransferServiceImpl implements TransferService {
     }
 
     // Determina si la transferencia es ONLINE o DIFERIDA (mantengo tu implementación)
-    private String determineTransferType(LocalDateTime dt) {
-        var day = dt.getDayOfWeek();
-        int hour = dt.getHour();
+    private boolean determineTransferType(LocalDateTime dateTime) {
+        // Lógica para determinar si la transferencia es ONLINE o DIFERIDA
+        // Por ejemplo:
+        LocalTime now = dateTime.toLocalTime();
+        LocalTime startBusinessHours = LocalTime.of(9, 0); // 9:00 AM
+        LocalTime endBusinessHours = LocalTime.of(18, 0);   // 6:00 PM
 
-        boolean isWeekday = day != java.time.DayOfWeek.SATURDAY && day != java.time.DayOfWeek.SUNDAY;
-        boolean isBusinessHour = hour >= 8 && hour < 20;
-
-        if (isWeekday && isBusinessHour) {
-            return TRANSFER_TYPE_ONLINE;
-        } else {
-            return "DIFERIDA";
-        }
+        // Devuelve true si es día hábil y está dentro del horario laboral
+        return dateTime.getDayOfWeek().getValue() <= 5 &&  // Lunes a Viernes
+                !now.isBefore(startBusinessHours) &&        // Después de las 9:00 AM
+                now.isBefore(endBusinessHours);              // Antes de las 6:00 PM
     }
 
     // ---------- EXTERNAL ACCOUNT PLACEHOLDER ----------

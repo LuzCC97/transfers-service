@@ -16,6 +16,7 @@ import java.io.IOException;
 @Service
 public class ExternalAccountServiceImpl implements ExternalAccountService {
 
+    //Usa RestClient para hacer peticiones HTTP.
     private final RestClient restClient;
     private final String externalAccountServiceUrl;
     private final ObjectMapper objectMapper;
