@@ -13,7 +13,7 @@ class TransferMapperTest {
 
     private final TransferMapper mapper = Mappers.getMapper(TransferMapper.class);
 
-    //toTransfer_mapsAllFields: Verifica el mapeo completo de todos los campos a la entidad Transfer.
+    // toTransfer_mapsAllFields: Verifica el mapeo completo de todos los campos a la entidad Transfer.
     @Test
     void toTransfer_mapsAllFields() {
         String transferId = "TRX-123";
@@ -27,11 +27,20 @@ class TransferMapperTest {
         String transferType = "ONLINE";
         String status = "EJECUTADA";
 
-        Transfer t = mapper.toTransfer(
-                transferId, customerId, sourceAccountId,
-                destAccountNumber, destCurrency, amount, description,
-                transferDatetime, transferType, status
-        );
+        //  Ahora usamos TransferParams en lugar de 10 parámetros sueltos
+        TransferParams params = new TransferParams();
+        params.setTransferId(transferId);
+        params.setCustomerId(customerId);
+        params.setSourceAccountId(sourceAccountId);
+        params.setDestAccountNumber(destAccountNumber);
+        params.setDestCurrency(destCurrency);
+        params.setAmount(amount);
+        params.setDescription(description);
+        params.setTransferDatetime(transferDatetime);
+        params.setTransferType(transferType);
+        params.setStatus(status);
+
+        Transfer t = mapper.toTransfer(params);
 
         assertThat(t).isNotNull();
         assertThat(t.getTransferId()).isEqualTo(transferId);
@@ -46,7 +55,7 @@ class TransferMapperTest {
         assertThat(t.getStatus()).isEqualTo(status);
     }
 
-    //toResponse_mapsSelectedFieldsFromEntity: Comprueba que solo los campos seleccionados se mapeen al DTO de respuesta.
+    // toResponse_mapsSelectedFieldsFromEntity: Comprueba que solo los campos seleccionados se mapeen al DTO de respuesta.
     @Test
     void toResponse_mapsSelectedFieldsFromEntity() {
         Transfer t = new Transfer();
@@ -65,29 +74,25 @@ class TransferMapperTest {
         // commissionApplied no lo mapea el mapper; lo setea el servicio (puede quedar null aquí)
         assertThat(r.getCommissionApplied()).isNull();
     }
-    //toTransfer_allNullParams_returnsNull: Verifica el comportamiento con todos los parámetros nulos.
+
+    // toTransfer_allNullParams_returnsNull: Verifica el comportamiento cuando la fuente es nula.
     @Test
     void toTransfer_allNullParams_returnsNull() {
-        Transfer t = mapper.toTransfer(
-                null, null, null, null, null, null, null, null, null, null
-        );
+        // Ahora el metodo recibe un solo parámetro (TransferParams), así que
+        // para simular "all nulo" pasamos null directamente:
+        Transfer t = mapper.toTransfer(null);
         assertThat(t).isNull();
     }
-    //toTransfer_allowsSomeNullFields_andCreatesEntity: Comprueba el mapeo con algunos campos nulos.
+
+    // toTransfer_allowsSomeNullFields_andCreatesEntity: Comprueba el mapeo con algunos campos nulos.
     @Test
     void toTransfer_allowsSomeNullFields_andCreatesEntity() {
-        Transfer t = mapper.toTransfer(
-                "TRX-ONLY", // transferId NO null para evitar la guarda de MapStruct
-                null,       // customerId
-                null,       // sourceAccountId
-                null,       // destAccountNumber
-                null,       // destCurrency
-                null,       // amount
-                null,       // description
-                null,       // transferDatetime
-                null,       // transferType
-                null        // status
-        );
+        TransferParams params = new TransferParams();
+        params.setTransferId("TRX-ONLY"); // único campo no nulo
+        // el resto queda en null
+
+        Transfer t = mapper.toTransfer(params);
+
         assertThat(t).isNotNull();
         assertThat(t.getTransferId()).isEqualTo("TRX-ONLY");
         assertThat(t.getCustomerId()).isNull();
@@ -100,7 +105,8 @@ class TransferMapperTest {
         assertThat(t.getTransferType()).isNull();
         assertThat(t.getStatus()).isNull();
     }
-    //toResponse_nullSource_returnsNull: Verifica el comportamiento cuando la fuente es nula.
+
+    // toResponse_nullSource_returnsNull: Verifica el comportamiento cuando la fuente es nula.
     @Test
     void toResponse_nullSource_returnsNull() {
         TransferResponse r = mapper.toResponse(null);

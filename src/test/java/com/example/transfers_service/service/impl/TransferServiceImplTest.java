@@ -1,9 +1,6 @@
 package com.example.transfers_service.service.impl;
 
-import com.example.transfers_service.dto.request.AccountRef;
 import com.example.transfers_service.dto.request.CustomerRef;
-import com.example.transfers_service.dto.request.TransferData;
-import com.example.transfers_service.dto.request.TransferRequest;
 import com.example.transfers_service.entity.Account;
 import com.example.transfers_service.mapper.MovementMapper;
 import com.example.transfers_service.mapper.TransferMapper;
@@ -23,8 +20,9 @@ import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ExtendWith(MockitoExtension.class)
 class TransferServiceImplTest {
@@ -41,7 +39,7 @@ class TransferServiceImplTest {
 
     private Account sourceAccount;
     private Account destinationAccount;
-    private TransferRequest transferRequest;
+    // 🔹 Eliminado: private TransferRequest transferRequest;  (no se usaba)
 
     @BeforeEach
     void setUp() {
@@ -58,43 +56,17 @@ class TransferServiceImplTest {
         destinationAccount.setCurrency("PEN");
         destinationAccount.setBalance(500.00);
 
-        // Configuración básica del request
-        transferRequest = createTestRequest("A1", "A2", "PEN", 100.00, "C1");
+        // Si más adelante necesitas un TransferRequest, puedes crearlo como variable local en el test
     }
 
-    // Metodo auxiliar para crear requests de prueba
-    private TransferRequest createTestRequest(String sourceId, String destId,
-                                              String currency, double amount, String customerId) {
-        TransferData td = new TransferData();
-        td.setCurrency(currency);
-        td.setAmount(amount);
-        td.setDescription("Test Transfer");
 
-        AccountRef srcRef = new AccountRef();
-        srcRef.setAccountId(sourceId);
-        AccountRef dstRef = new AccountRef();
-        dstRef.setAccountId(destId);
-
-        TransferRequest req = new TransferRequest();
-        req.setSourceAccount(srcRef);
-        req.setDestinationAccount(dstRef);
-        req.setTransferData(td);
-
-        if (customerId != null) {
-            CustomerRef customerRef = new CustomerRef();
-            customerRef.setCustomerId(customerId);
-            req.setCustomer(customerRef);
-        }
-
-        return req;
-    }
 
     // Pruebas para validateSourceAccountOwner
     @Test
     void validateSourceAccountOwner_validOwner_doesNotThrow() throws Exception {
         // Arrange
-        Account sourceAccount = new Account();
-        sourceAccount.setCustomerId("CUST123");
+        Account account = new Account();       // 🔹 Renombrado para no ocultar el field sourceAccount
+        account.setCustomerId("CUST123");
         CustomerRef customerRef = new CustomerRef();
         customerRef.setCustomerId("CUST123");
 
@@ -102,10 +74,10 @@ class TransferServiceImplTest {
         Method method = TransferServiceImpl.class.getDeclaredMethod("validateSourceAccountOwner",
                 Account.class, CustomerRef.class);
         method.setAccessible(true);
-        assertDoesNotThrow(() -> method.invoke(service, sourceAccount, customerRef));
+        assertDoesNotThrow(() -> method.invoke(service, account, customerRef));
 
         // Additional verification that the method completed successfully
-        assertThat(sourceAccount.getCustomerId()).isEqualTo(customerRef.getCustomerId());
+        assertThat(account.getCustomerId()).isEqualTo(customerRef.getCustomerId());
     }
 
     @Test
@@ -139,11 +111,6 @@ class TransferServiceImplTest {
         method.setAccessible(true);
         method.invoke(service, account, customerRef);
     }
-
-    // Pruebas para createTransfer
-
-
-
 
     // Pruebas para calculateCharges
     @Test
@@ -217,7 +184,6 @@ class TransferServiceImplTest {
     }
 
     // Pruebas para convert
-
     @Test
     void convert_usdToPen_returnsCorrectAmount() throws Exception {
         // Arrange

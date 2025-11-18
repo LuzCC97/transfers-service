@@ -6,6 +6,7 @@ import com.example.transfers_service.entity.Transfer;
 import com.example.transfers_service.exception.AccountNotFoundException;
 import com.example.transfers_service.exception.InsufficientBalanceException;
 import com.example.transfers_service.mapper.MovementParams;
+import com.example.transfers_service.mapper.TransferParams;
 import com.example.transfers_service.repository.AccountRepository;
 import com.example.transfers_service.repository.MovementRepository;
 import com.example.transfers_service.repository.TransferRepository;
@@ -14,11 +15,11 @@ import com.example.transfers_service.service.TransferService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -30,7 +31,6 @@ public class TransferServiceImpl implements TransferService {
     private final IdGeneratorService idGeneratorService;
     private final com.example.transfers_service.mapper.TransferMapper transferMapper;
     private final com.example.transfers_service.mapper.MovementMapper movementMapper;
-
 
     public TransferServiceImpl(TransferRepository transferRepository,
                                MovementRepository movementRepository,
@@ -100,20 +100,23 @@ public class TransferServiceImpl implements TransferService {
                 sourceCurrency,
                 sourceAccountEntity.getAccountId()
         );
+
         String transferId = "TRX-" + idGeneratorService.nextTransferId();
-        // 8) Crear y guardar Transfer
-        Transfer transfer = buildAndSaveTransfer(
-                request,
-                sourceAccountEntity,
-                destinationData,
-                amountUser,
-                amountToCredit,
-                destCurrency,
-                userCurrency,
-                chargesData,
-                dateTime,
-                transferId
-        );
+
+        // 8) Crear y guardar Transfer usando BuildTransferParams
+        BuildTransferParams buildParams = new BuildTransferParams();
+        buildParams.setRequest(request);
+        buildParams.setSourceAccountEntity(sourceAccountEntity);
+        buildParams.setDestinationData(destinationData);
+        buildParams.setAmountUser(amountUser);
+        buildParams.setAmountToCredit(amountToCredit);
+        buildParams.setDestCurrency(destCurrency);
+        buildParams.setUserCurrency(userCurrency);
+        buildParams.setChargesData(chargesData);
+        buildParams.setDateTime(dateTime);
+        buildParams.setTransferId(transferId);
+
+        Transfer transfer = buildAndSaveTransfer(buildParams);
 
         // 9) Registrar movimientos en cuenta origen (OUT)
         registerSourceMovements(
@@ -143,14 +146,16 @@ public class TransferServiceImpl implements TransferService {
         );
         return response;
     }
-    //2. Helpers privados a agregar en la misma clase
-    //2.1Resolver cuenta origen
+
+    // 2. Helpers privados a agregar en la misma clase
+
+    // 2.1 Resolver cuenta origen
     private com.example.transfers_service.entity.Account getAndLockSourceAccount(String sourceAccountId) {
         return accountRepository.findAndLockByAccountId(sourceAccountId)
                 .orElseThrow(() -> new RuntimeException("Cuenta no existe: " + sourceAccountId));
     }
 
-    //2.3 Validar que la cuenta origen pertenezca al cliente del JSON
+    // 2.3 Validar que la cuenta origen pertenezca al cliente del JSON
     private void validateSourceAccountOwner(
             com.example.transfers_service.entity.Account sourceAccountEntity,
             com.example.transfers_service.dto.request.CustomerRef customerRef
@@ -172,8 +177,7 @@ public class TransferServiceImpl implements TransferService {
         }
     }
 
-
-    //2.2. Clase para encapsular información del destino
+    // 2.2. Clase para encapsular información del destino
     private static class DestinationData {
         private final boolean external;
         private final com.example.transfers_service.entity.Account internalAccount;
@@ -206,7 +210,8 @@ public class TransferServiceImpl implements TransferService {
             return destCurrency;
         }
     }
-    //2.3. Resolver cuenta destino (interna o externa)
+
+    // 2.3. Resolver cuenta destino (interna o externa)
     private DestinationData resolveDestinationAccount(String destinyAccountId) {
         var destinyAccountEntityOpt = accountRepository.findAndLockByAccountId(destinyAccountId);
 
@@ -234,6 +239,7 @@ public class TransferServiceImpl implements TransferService {
 
         throw new AccountNotFoundException("Cuenta destino no existe en nuestra bd ni en el servicio externo: " + destinyAccountId);
     }
+
     private void validateSupportedCurrencies(String... currencies) {
         for (String cur : currencies) {
             if (!cur.equalsIgnoreCase(CUR_PEN) && !cur.equalsIgnoreCase(CUR_USD)) {
@@ -242,12 +248,13 @@ public class TransferServiceImpl implements TransferService {
         }
     }
 
-    //2.5. Construir monto ingresado por el usuario
+    // 2.5. Construir monto ingresado por el usuario
     private BigDecimal buildUserAmount(TransferRequest request) {
         return BigDecimal.valueOf(request.getTransferData().getAmount())
                 .setScale(SCALE + 4, RoundingMode.HALF_UP);
     }
-    //2.6. Cálculo de montos a debitar / acreditar
+
+    // 2.6. Cálculo de montos a debitar / acreditar
     private BigDecimal calculateAmountToDebit(BigDecimal amountUser,
                                               String userCurrency,
                                               String sourceCurrency) {
@@ -271,7 +278,8 @@ public class TransferServiceImpl implements TransferService {
         return convert(amountUser, userCurrency, destCurrency)
                 .setScale(SCALE + 4, RoundingMode.HALF_UP);
     }
-    //2.7. Clase para encapsular los cargos (comisión, ITF, total, tipo)
+
+    // 2.7. Clase para encapsular los cargos (comisión, ITF, total, tipo)
     public static class ChargesData {
         private final String transferType;
         private final BigDecimal commission;
@@ -301,7 +309,8 @@ public class TransferServiceImpl implements TransferService {
             return totalDebit;
         }
     }
-    //2.8. Cálculo de tipo, comisión, ITF y total a debitar
+
+    // 2.8. Cálculo de tipo, comisión, ITF y total a debitar
     private ChargesData calculateCharges(String sourceCurrency,
                                          BigDecimal amountToDebit,
                                          LocalDateTime dateTime) {
@@ -329,7 +338,8 @@ public class TransferServiceImpl implements TransferService {
 
         return new ChargesData(transferType, commission, itf, totalDebit);
     }
-    //2.9. Validar y actualizar saldo origen
+
+    // 2.9. Validar y actualizar saldo origen
     private void updateSourceBalanceOrThrow(com.example.transfers_service.entity.Account sourceAccountEntity,
                                             BigDecimal totalDebit,
                                             String sourceCurrency,
@@ -355,17 +365,114 @@ public class TransferServiceImpl implements TransferService {
 
         sourceAccountEntity.setBalance(newSourceBalanceBD.doubleValue());
     }
-    //2.10. Construir y guardar Transfer
-    private Transfer buildAndSaveTransfer(TransferRequest request,
-                                          com.example.transfers_service.entity.Account sourceAccountEntity,
-                                          DestinationData destinationData,
-                                          BigDecimal amountUser,
-                                          BigDecimal amountToCredit,
-                                          String destCurrency,
-                                          String userCurrency,
-                                          ChargesData chargesData,
-                                          LocalDateTime dateTime,
-                                          String transferId) {
+
+    // Clase interna para agrupar todos los datos necesarios para construir y guardar la Transfer
+    private static class BuildTransferParams {
+        private TransferRequest request;
+        private com.example.transfers_service.entity.Account sourceAccountEntity;
+        private DestinationData destinationData;
+        private BigDecimal amountUser;
+        private BigDecimal amountToCredit;
+        private String destCurrency;
+        private String userCurrency;
+        private ChargesData chargesData;
+        private LocalDateTime dateTime;
+        private String transferId;
+
+        public TransferRequest getRequest() {
+            return request;
+        }
+
+        public void setRequest(TransferRequest request) {
+            this.request = request;
+        }
+
+        public com.example.transfers_service.entity.Account getSourceAccountEntity() {
+            return sourceAccountEntity;
+        }
+
+        public void setSourceAccountEntity(com.example.transfers_service.entity.Account sourceAccountEntity) {
+            this.sourceAccountEntity = sourceAccountEntity;
+        }
+
+        public DestinationData getDestinationData() {
+            return destinationData;
+        }
+
+        public void setDestinationData(DestinationData destinationData) {
+            this.destinationData = destinationData;
+        }
+
+        public BigDecimal getAmountUser() {
+            return amountUser;
+        }
+
+        public void setAmountUser(BigDecimal amountUser) {
+            this.amountUser = amountUser;
+        }
+
+        public BigDecimal getAmountToCredit() {
+            return amountToCredit;
+        }
+
+        public void setAmountToCredit(BigDecimal amountToCredit) {
+            this.amountToCredit = amountToCredit;
+        }
+
+        public String getDestCurrency() {
+            return destCurrency;
+        }
+
+        public void setDestCurrency(String destCurrency) {
+            this.destCurrency = destCurrency;
+        }
+
+        public String getUserCurrency() {
+            return userCurrency;
+        }
+
+        public void setUserCurrency(String userCurrency) {
+            this.userCurrency = userCurrency;
+        }
+
+        public ChargesData getChargesData() {
+            return chargesData;
+        }
+
+        public void setChargesData(ChargesData chargesData) {
+            this.chargesData = chargesData;
+        }
+
+        public LocalDateTime getDateTime() {
+            return dateTime;
+        }
+
+        public void setDateTime(LocalDateTime dateTime) {
+            this.dateTime = dateTime;
+        }
+
+        public String getTransferId() {
+            return transferId;
+        }
+
+        public void setTransferId(String transferId) {
+            this.transferId = transferId;
+        }
+    }
+
+    // 2.10. Construir y guardar Transfer
+    private Transfer buildAndSaveTransfer(BuildTransferParams buildParams) {
+
+        var request             = buildParams.getRequest();
+        var sourceAccountEntity = buildParams.getSourceAccountEntity();
+        var destinationData     = buildParams.getDestinationData();
+        var amountUser          = buildParams.getAmountUser();
+        var amountToCredit      = buildParams.getAmountToCredit();
+        var destCurrency        = buildParams.getDestCurrency();
+        var userCurrency        = buildParams.getUserCurrency();
+        var chargesData         = buildParams.getChargesData();
+        var dateTime            = buildParams.getDateTime();
+        var transferId          = buildParams.getTransferId();
 
         String status;
         if (destinationData.isExternal()) {
@@ -388,25 +495,35 @@ public class TransferServiceImpl implements TransferService {
                 amountToCredit.setScale(SCALE, RoundingMode.HALF_UP).toPlainString(), destCurrency.toUpperCase()
         );
 
-        Transfer transfer = transferMapper.toTransfer(
-                transferId,
-                sourceAccountEntity.getCustomerId(),
-                sourceAccountEntity.getAccountId(),
+        // Armamos el TransferParams para el mapper
+        TransferParams params = new TransferParams();
+        params.setTransferId(transferId);
+        params.setCustomerId(sourceAccountEntity.getCustomerId());
+        params.setSourceAccountId(sourceAccountEntity.getAccountId());
+        params.setDestAccountNumber(
                 destinationData.isExternal()
                         ? destinationData.getExternalAccountInfo().getAccountId()
-                        : destinationData.getInternalAccount().getAccountId(),
-                destCurrency,
-                amountToCredit.setScale(SCALE, RoundingMode.HALF_UP).doubleValue(),
-                (baseDesc == null ? "" : baseDesc) + descInput,
-                dateTime,
-                chargesData.getTransferType().toUpperCase(),
-                status
+                        : destinationData.getInternalAccount().getAccountId()
         );
+        params.setDestCurrency(destCurrency);
+        params.setAmount(
+                amountToCredit.setScale(SCALE, RoundingMode.HALF_UP).doubleValue()
+        );
+        params.setDescription(
+                (baseDesc == null ? "" : baseDesc) + descInput
+        );
+        params.setTransferDatetime(dateTime);
+        params.setTransferType(chargesData.getTransferType().toUpperCase());
+        params.setStatus(status);
+
+        // MapStruct construye la entidad Transfer desde params
+        Transfer transfer = transferMapper.toTransfer(params);
 
         transferRepository.save(transfer);
         return transfer;
     }
-    //2.11. Registrar movimientos en origen
+
+    // 2.11. Registrar movimientos en origen
     private void registerSourceMovements(String sourceAccountId,
                                          String transferId,
                                          BigDecimal amountToDebit,
@@ -445,7 +562,8 @@ public class TransferServiceImpl implements TransferService {
             );
         }
     }
-    //2.12. Aplicar crédito a destino
+
+    // 2.12. Aplicar crédito a destino
     private void applyDestinationCredit(DestinationData destinationData,
                                         String transferId,
                                         BigDecimal amountToCredit,
@@ -482,9 +600,6 @@ public class TransferServiceImpl implements TransferService {
 
         destEntity.setBalance(newDestBalanceBD.doubleValue());
     }
-    //
-
-
 
     /**
      * Convierte amount (BigDecimal) desde la moneda 'from' hacia la moneda 'to'
@@ -527,8 +642,6 @@ public class TransferServiceImpl implements TransferService {
         movementRepository.save(movement);
     }
 
-
-
     // Determina si la transferencia es ONLINE o DIFERIDA (mantengo tu implementación)
     private String determineTransferType(LocalDateTime dt) {
         var day = dt.getDayOfWeek();
@@ -543,6 +656,7 @@ public class TransferServiceImpl implements TransferService {
             return "DIFERIDA";
         }
     }
+
     // ---------- EXTERNAL ACCOUNT PLACEHOLDER ----------
 
     // POJO simple para info mínima que esperamos del servicio externo
@@ -559,12 +673,13 @@ public class TransferServiceImpl implements TransferService {
         public String getCurrency() { return currency; }
     }
 
-    /**
-     * Placeholder: busca la cuenta destino en un servicio externo (otro banco).
-     * Reemplazar por llamada REST real (WebClient/RestTemplate) que retorne la moneda y validez.
-     */
-    Optional<ExternalAccountInfo> fetchExternalAccount(String accountId) {
-       return Optional.empty();
+     //Placeholder: busca la cuenta destino en un servicio externo (otro banco).
+     //Reemplazar por llamada REST real (WebClient/RestTemplate) que retorne la moneda y validez.
+     Optional<ExternalAccountInfo> fetchExternalAccount(String accountId) {
+         // evitar warning de Sonar
+         Objects.requireNonNull(accountId);
 
-    }
+         return Optional.empty();
+     }
+
 }
