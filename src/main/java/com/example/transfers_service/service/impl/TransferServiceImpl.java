@@ -1,17 +1,24 @@
 package com.example.transfers_service.service.impl;
 
+import com.example.transfers_service.dto.external.ExternalAccountResponse;
 import com.example.transfers_service.dto.request.TransferRequest;
 import com.example.transfers_service.dto.response.TransferResponse;
 import com.example.transfers_service.entity.Transfer;
 import com.example.transfers_service.exception.AccountNotFoundException;
+import com.example.transfers_service.exception.ExternalAccountValidationException;
 import com.example.transfers_service.exception.InsufficientBalanceException;
 import com.example.transfers_service.mapper.MovementParams;
 import com.example.transfers_service.mapper.TransferParams;
 import com.example.transfers_service.repository.AccountRepository;
 import com.example.transfers_service.repository.MovementRepository;
 import com.example.transfers_service.repository.TransferRepository;
+import com.example.transfers_service.service.ExternalAccountService;
 import com.example.transfers_service.service.IdGeneratorService;
 import com.example.transfers_service.service.TransferService;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,19 +38,23 @@ public class TransferServiceImpl implements TransferService {
     private final IdGeneratorService idGeneratorService;
     private final com.example.transfers_service.mapper.TransferMapper transferMapper;
     private final com.example.transfers_service.mapper.MovementMapper movementMapper;
+    private final ExternalAccountService externalAccountService;
 
     public TransferServiceImpl(TransferRepository transferRepository,
                                MovementRepository movementRepository,
                                AccountRepository accountRepository,
                                IdGeneratorService idGeneratorService,
                                com.example.transfers_service.mapper.TransferMapper transferMapper,
-                               com.example.transfers_service.mapper.MovementMapper movementMapper) {
+                               com.example.transfers_service.mapper.MovementMapper movementMapper,
+                               ExternalAccountService externalAccountService) {
         this.transferRepository = transferRepository;
         this.movementRepository = movementRepository;
         this.accountRepository = accountRepository;
         this.idGeneratorService = idGeneratorService;
         this.transferMapper = transferMapper;
         this.movementMapper = movementMapper;
+        this.externalAccountService = externalAccountService;
+
     }
 
     // DATOS PARA CONVERSION
@@ -178,6 +189,7 @@ public class TransferServiceImpl implements TransferService {
     }
 
     // 2.2. Clase para encapsular información del destino
+    @Data
     private static class DestinationData {
         private final boolean external;
         private final com.example.transfers_service.entity.Account internalAccount;
@@ -192,22 +204,6 @@ public class TransferServiceImpl implements TransferService {
             this.internalAccount = internalAccount;
             this.externalAccountInfo = externalAccountInfo;
             this.destCurrency = destCurrency;
-        }
-
-        public boolean isExternal() {
-            return external;
-        }
-
-        public com.example.transfers_service.entity.Account getInternalAccount() {
-            return internalAccount;
-        }
-
-        public ExternalAccountInfo getExternalAccountInfo() {
-            return externalAccountInfo;
-        }
-
-        public String getDestCurrency() {
-            return destCurrency;
         }
     }
 
@@ -280,6 +276,7 @@ public class TransferServiceImpl implements TransferService {
     }
 
     // 2.7. Clase para encapsular los cargos (comisión, ITF, total, tipo)
+    @Data
     public static class ChargesData {
         private final String transferType;
         private final BigDecimal commission;
@@ -293,21 +290,6 @@ public class TransferServiceImpl implements TransferService {
             this.totalDebit = totalDebit;
         }
 
-        public String getTransferType() {
-            return transferType;
-        }
-
-        public BigDecimal getCommission() {
-            return commission;
-        }
-
-        public BigDecimal getItf() {
-            return itf;
-        }
-
-        public BigDecimal getTotalDebit() {
-            return totalDebit;
-        }
     }
 
     // 2.8. Cálculo de tipo, comisión, ITF y total a debitar
@@ -367,6 +349,7 @@ public class TransferServiceImpl implements TransferService {
     }
 
     // Clase interna para agrupar todos los datos necesarios para construir y guardar la Transfer
+    @Data
     private static class BuildTransferParams {
         private TransferRequest request;
         private com.example.transfers_service.entity.Account sourceAccountEntity;
@@ -379,85 +362,6 @@ public class TransferServiceImpl implements TransferService {
         private LocalDateTime dateTime;
         private String transferId;
 
-        public TransferRequest getRequest() {
-            return request;
-        }
-
-        public void setRequest(TransferRequest request) {
-            this.request = request;
-        }
-
-        public com.example.transfers_service.entity.Account getSourceAccountEntity() {
-            return sourceAccountEntity;
-        }
-
-        public void setSourceAccountEntity(com.example.transfers_service.entity.Account sourceAccountEntity) {
-            this.sourceAccountEntity = sourceAccountEntity;
-        }
-
-        public DestinationData getDestinationData() {
-            return destinationData;
-        }
-
-        public void setDestinationData(DestinationData destinationData) {
-            this.destinationData = destinationData;
-        }
-
-        public BigDecimal getAmountUser() {
-            return amountUser;
-        }
-
-        public void setAmountUser(BigDecimal amountUser) {
-            this.amountUser = amountUser;
-        }
-
-        public BigDecimal getAmountToCredit() {
-            return amountToCredit;
-        }
-
-        public void setAmountToCredit(BigDecimal amountToCredit) {
-            this.amountToCredit = amountToCredit;
-        }
-
-        public String getDestCurrency() {
-            return destCurrency;
-        }
-
-        public void setDestCurrency(String destCurrency) {
-            this.destCurrency = destCurrency;
-        }
-
-        public String getUserCurrency() {
-            return userCurrency;
-        }
-
-        public void setUserCurrency(String userCurrency) {
-            this.userCurrency = userCurrency;
-        }
-
-        public ChargesData getChargesData() {
-            return chargesData;
-        }
-
-        public void setChargesData(ChargesData chargesData) {
-            this.chargesData = chargesData;
-        }
-
-        public LocalDateTime getDateTime() {
-            return dateTime;
-        }
-
-        public void setDateTime(LocalDateTime dateTime) {
-            this.dateTime = dateTime;
-        }
-
-        public String getTransferId() {
-            return transferId;
-        }
-
-        public void setTransferId(String transferId) {
-            this.transferId = transferId;
-        }
     }
 
     // 2.10. Construir y guardar Transfer
@@ -660,26 +564,35 @@ public class TransferServiceImpl implements TransferService {
     // ---------- EXTERNAL ACCOUNT PLACEHOLDER ----------
 
     // POJO simple para info mínima que esperamos del servicio externo
+    @Data
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @Builder
     static class ExternalAccountInfo {
         private final String accountId;
         private final String currency;
+        private final String holderName;
+        private final String bankName;
 
         public ExternalAccountInfo(String accountId, String currency) {
-            this.accountId = accountId;
-            this.currency = currency;
+            this(accountId, currency, null, null);
         }
-
-        public String getAccountId() { return accountId; }
-        public String getCurrency() { return currency; }
     }
 
      //Placeholder: busca la cuenta destino en un servicio externo (otro banco).
      //Reemplazar por llamada REST real (WebClient/RestTemplate) que retorne la moneda y validez.
      Optional<ExternalAccountInfo> fetchExternalAccount(String accountId) {
-         // evitar warning de Sonar
-         Objects.requireNonNull(accountId);
-
-         return Optional.empty();
+         try {
+             ExternalAccountResponse response = externalAccountService.validateExternalAccount(accountId);
+             if (response != null && "ACTIVE".equals(response.getStatus())) {
+                 return Optional.of(new ExternalAccountInfo(
+                         response.getExternalAccountId(),
+                         response.getCurrency()
+                 ));
+             }
+             return Optional.empty();
+         } catch (ExternalAccountValidationException e) {
+             return Optional.empty();
+         }
      }
 
 }
