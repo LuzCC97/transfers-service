@@ -564,8 +564,8 @@ public class TransferServiceImpl implements TransferService {
         // Lógica para determinar si la transferencia es ONLINE o DIFERIDA
         // Por ejemplo:
         LocalTime now = dateTime.toLocalTime();
-        LocalTime startBusinessHours = LocalTime.of(9, 0); // 9:00 AM
-        LocalTime endBusinessHours = LocalTime.of(18, 0);   // 6:00 PM
+        LocalTime startBusinessHours = LocalTime.of(8, 0); // 9:00 AM
+        LocalTime endBusinessHours = LocalTime.of(20, 0);   // 6:00 PM
 
         // Devuelve true si es día hábil y está dentro del horario laboral
         return dateTime.getDayOfWeek().getValue() <= 5 &&  // Lunes a Viernes
